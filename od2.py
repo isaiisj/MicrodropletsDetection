@@ -1,8 +1,107 @@
 import cv2
 import numpy as np
 from matplotlib import pyplot as plt
+import tkinter as tk
+from tkinter import ttk
+import os
+from tkinter import filedialog as fd
+from tkinter.messagebox import showinfo
 
-path = input("Introduce la ruta de la imagen: ")
+
+def getInput(): 
+    inp = inputtxt.get(1.0, "end-1c") 
+    #lbl.config(text = "Provided Input: "+inp) 
+    return inp
+
+def setPath():
+    global path
+    path = getInput()
+    frame.destroy()
+
+# Top level window 
+frame = tk.Tk() 
+frame.title("Introduzca imagen") 
+frame.geometry('400x200') 
+# Function for getting Input 
+# from textbox and printing it  
+# at label widget 
+
+inputtxt = tk.Text(frame, height=5, width=20)
+inputtxt.pack()
+
+printButton = tk.Button(frame, text="Scan", command=setPath)
+printButton.pack()
+
+
+'''
+# Get the current working directory (directory where the script is located)
+script_directory = os.path.dirname(os.path.abspath(__file__))
+
+# Top level window 
+frame = tk.Tk() 
+frame.title("Introduzca imagen") 
+frame.geometry('400x200') 
+# Function for getting Input 
+# from textbox and printing it  
+# at label widget 
+
+def select_file():
+    global path
+
+    filetypes = (
+        ('Image files', '*.jpg'),
+        ('Image files', '*.JPG'),
+        ('All files', '*.*')
+    )
+
+
+    path = fd.askopenfilename(
+        title='Open a file',
+        initialdir=script_directory,
+        filetypes=filetypes)
+
+    showinfo(
+        title='Selected File',
+        message=path
+    )
+
+    if path:
+        frame.destroy()
+
+
+# open button
+open_button = ttk.Button(
+    frame,
+    text='Open a File',
+    command=select_file
+)
+
+open_button.pack(expand=True)
+
+
+# run the application
+#frame.mainloop()
+
+
+if path:
+    # Make the path relative to the script's directory
+    relative_path = os.path.relpath(path, script_directory)
+
+    # Remove leading and trailing whitespace
+    trimmed_path = relative_path.strip()
+
+    print("Script Directory:", script_directory)
+    print("Relative Path:",relative_path)
+'''
+
+
+path = " "
+
+# run the application
+frame.mainloop()
+
+# Now, you can use the 'path' variable after the mainloop, and it will be updated when the "Scan" button is clicked.
+print(path)
 
 #Read image
 img = cv2.imread(path, cv2.IMREAD_COLOR)
@@ -12,13 +111,33 @@ img = cv2.rotate(img, cv2.ROTATE_90_CLOCKWISE)
 
 #Resizing image
 copia = img
-copia = cv2.resize(copia,(900,700),interpolation = cv2.INTER_AREA)
+copia = cv2.resize(copia,(1000,700),interpolation = cv2.INTER_AREA)
+cv2.imshow("resized", copia)
+cv2.waitKey(0)
+
+'''#Aumentamos contraste
+gamma = 25
+lookUpTable = np.empty((1,256),np.uint8)
+for i in range(256):
+    lookUpTable[0,i] = np.clip(pow(i/255.0,gamma)*255.0,0,255)
+copia = cv2.LUT(copia, lookUpTable)
+cv2.imshow('img contrastada', copia)
+cv2.waitKey(0)'''
+
 
 #RGB split
-b, g , r  = cv2.split(img)
-b2 = cv2.resize(b,(900,700),interpolation = cv2.INTER_AREA)
-g2 = cv2.resize(g,(900,700),interpolation = cv2.INTER_AREA)
-r2 = cv2.resize(r,(900,700),interpolation = cv2.INTER_AREA)
+b, g , r  = cv2.split(copia)
+enhanced_green = cv2.equalizeHist(g)
+# Merge the channels back
+enhanced_image = cv2.merge([b, enhanced_green, r])
+# Display the original and enhanced images
+cv2.imshow('Enhanced Image', enhanced_image)
+cv2.waitKey(0)
+
+#Thresholding
+_,th = cv2.threshold(enhanced_green,150,255, cv2.THRESH_BINARY_INV)
+cv2.imshow("binary", th)
+cv2.waitKey(0)
 
 #Umbralizacion de pixeles
 '''
