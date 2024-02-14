@@ -6,6 +6,15 @@ from tkinter import ttk
 import os
 from tkinter import filedialog as fd
 from tkinter.messagebox import showinfo
+from scipy import fftpack
+from PIL import Image
+
+def show_variable(variable_value):
+    root = tk.Tk()
+    root.withdraw()  # Hide the main window
+
+    showinfo("Total droplets",f"Number of droplets {variable_value}")
+
 
 
 def getInput(): 
@@ -115,16 +124,9 @@ copia = cv2.resize(copia,(1000,700),interpolation = cv2.INTER_AREA)
 cv2.imshow("resized", copia)
 cv2.waitKey(0)
 
-'''#Aumentamos contraste
-gamma = 25
-lookUpTable = np.empty((1,256),np.uint8)
-for i in range(256):
-    lookUpTable[0,i] = np.clip(pow(i/255.0,gamma)*255.0,0,255)
-copia = cv2.LUT(copia, lookUpTable)
-cv2.imshow('img contrastada', copia)
-cv2.waitKey(0)'''
 
 
+#Separamos en 3 canales y Aumentamos contrasted del canal verde
 #RGB split
 b, g , r  = cv2.split(copia)
 enhanced_green = cv2.equalizeHist(g)
@@ -134,8 +136,39 @@ enhanced_image = cv2.merge([b, enhanced_green, r])
 cv2.imshow('Enhanced Image', enhanced_image)
 cv2.waitKey(0)
 
+#############################################
+'''
+# Load an image
+image = np.array(enhanced_image)  # Convert to grayscale if necessary
+
+# Perform 2D FFT
+fft_result = fftpack.fft2(image)
+
+# Shift zero frequency components to the center
+fft_result_shifted = fftpack.fftshift(fft_result)
+
+# Calculate the magnitude spectrum
+magnitude_spectrum = np.abs(fft_result_shifted)
+
+# Display the original and FFT images
+plt.figure(figsize=(10, 5))
+
+plt.subplot(121)
+plt.imshow(image, cmap='gray')
+plt.title('Original Image')
+
+plt.subplot(122)
+plt.imshow(np.log(1 + magnitude_spectrum), cmap='gray')  # Log transformation for better visualization
+plt.title('Magnitude Spectrum (FFT)')
+
+plt.show()
+'''
+###############################################
+
+
+
 #Thresholding
-_,th = cv2.threshold(enhanced_green,150,255, cv2.THRESH_BINARY_INV)
+_,th = cv2.threshold(enhanced_green,150,255, cv2.THRESH_BINARY)
 cv2.imshow("binary", th)
 cv2.waitKey(0)
 
@@ -158,17 +191,28 @@ plt.show()'''
 
 
 #Bluring image
-g2 = cv2.medianBlur(g2,5)
+g2 = cv2.medianBlur(th,3)
+#g2 = cv2.medianBlur(th,5)
+cv2.imshow("blurred", g2)
+cv2.waitKey(0)
+
 
 #Border detection
-g2 = cv2.Canny(g2,0,20)
+g2 = cv2.Canny(g2,0,10)
+#g2 = cv2.Canny(g2,0,20)
+cv2.imshow("canny", g2)
+cv2.waitKey(0)
 
 #Border dilation and erode
 g2 = cv2.dilate(g2, None, iterations=1)
 g2 = cv2.erode(g2, None, iterations=1)
+cv2.imshow("dilate and erode", g2)
+cv2.waitKey(0)
+
 
 #rows = g2.shape[0]
-detected_circles = cv2.HoughCircles(g2,cv2.HOUGH_GRADIENT, 1, 20, param1 = 100, param2 = 20, minRadius = 8, maxRadius = 29)
+detected_circles = cv2.HoughCircles(g2,cv2.HOUGH_GRADIENT, 1, 20, param1 = 100, param2 = 6, minRadius = 5, maxRadius = 12)
+#detected_circles = cv2.HoughCircles(g2,cv2.HOUGH_GRADIENT, 1, 20, param1 = 100, param2 = 11, minRadius = 13, maxRadius = 29)
 detected_circles2 = cv2.HoughCircles(g2,cv2.HOUGH_GRADIENT, 1, 20, param1 = 100, param2  = 30, minRadius = 3, maxRadius = 27)
 
 count = 0
@@ -250,6 +294,7 @@ if detected_circles2 is not None:
 #Displaying image
 #cv2.imshow('image',copia)
 #cv2.imshow('Green', g2)
-print(count)
+#print(count)
+show_variable(count)
 cv2.waitKey(0)
 cv2.destroyAllWindows()
