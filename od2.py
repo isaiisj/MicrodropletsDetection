@@ -137,35 +137,6 @@ cv2.imshow('Enhanced Image', enhanced_image)
 cv2.waitKey(0)
 
 #############################################
-'''
-# Load an image
-image = np.array(enhanced_image)  # Convert to grayscale if necessary
-
-# Perform 2D FFT
-fft_result = fftpack.fft2(image)
-
-# Shift zero frequency components to the center
-fft_result_shifted = fftpack.fftshift(fft_result)
-
-# Calculate the magnitude spectrum
-magnitude_spectrum = np.abs(fft_result_shifted)
-
-# Display the original and FFT images
-plt.figure(figsize=(10, 5))
-
-plt.subplot(121)
-plt.imshow(image, cmap='gray')
-plt.title('Original Image')
-
-plt.subplot(122)
-plt.imshow(np.log(1 + magnitude_spectrum), cmap='gray')  # Log transformation for better visualization
-plt.title('Magnitude Spectrum (FFT)')
-
-plt.show()
-'''
-###############################################
-
-
 
 #Thresholding
 _,th = cv2.threshold(enhanced_green,150,255, cv2.THRESH_BINARY)
@@ -243,53 +214,6 @@ if detected_circles is not None and detected_circles2 is not None:
 
 
 ###########################################################################
-'''
-detected_circles = cv2.HoughCircles(g2,cv2.HOUGH_GRADIENT, 1, 20, param1 = 100, param2 = 35, minRadius = 2, maxRadius = 29)
-count = 0
-
-if detected_circles is not None:
-
-    detected_circles = np.uint16(np.around(detected_circles))
-
-    for pt in detected_circles[0, :]:
-        a, b, r = pt[0], pt[1], pt[2]
-
-        cv2.circle(copia, (a,b), r, (0, 0, 255), 2)
-
-        cv2.circle(copia, (a,b), 1, (0, 0, 255), 3)
-        count += 1
-        cv2.imshow("Circles", copia)
-
-'''
-#**************************************************
-'''
-detected_circles2 = cv2.HoughCircles(thresh1,cv2.HOUGH_GRADIENT,1,20, param1 = 100, param2 = 22, minRadius = 2, maxRadius = 26) 
-
-count2 = 0
-
-if detected_circles2 is not None:
-    detected_circles2 = np.uint16(np.around(detected_circles2))
-
-    for pt in detected_circles2[0, :]:
-        a, b,r = pt[0], pt[1], pt[2]
-
-        cv2.circle(copia, (a,b), r, (255,0,0),2)
-
-        cv2.circle(copia, (a,b),1,(255,0,0),3)
-
-        cv2.imshow("Circles", copia)
-'''
-#*************************************************************************************************************
-
-#Finding contours
-#_,cnts = cv2.findContours(g2, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
-#Drwaing contours
-#for c in cnts:
-#    epsilon = 0.01 * cv2.arcLength(c,True)
-#    approx = cv2.approxPolyDP(c,epsilon,True)
-    
-#***************************************************************************************************************
 
 #Displaying image
 #cv2.imshow('image',copia)
