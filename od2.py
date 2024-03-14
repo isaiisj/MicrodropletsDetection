@@ -16,6 +16,11 @@ def show_variable(variable_value):
 
     showinfo("Total droplets",f"Number of droplets {variable_value}")
 
+def show_ratio(variable_value):
+    root = tk.Tk()
+    root.withdraw()  # Hide the main window
+
+    showinfo("Ratio",f" {variable_value}")
 ########################################
 '''
 class CanvasImage:
@@ -168,9 +173,11 @@ if detected_circles is not None and detected_circles2 is not None:
 
         cv2.circle(copia, (a,b), 1, (0, 0, 255), 3)
         count += 1
-        cv2.imshow("Circles", copia)
+        cv2.imshow("All", copia)
     
-    '''for pt in detected_circles2[0, :]:
+##########################################3
+'''
+    for pt in detected_circles2[0, :]:
         a,b,r = pt[0], pt[1], pt[2]
 
         cv2.circle(copia, (a,b), r, (255,0,30),2)
@@ -186,18 +193,18 @@ if detected_circles is not None and detected_circles2 is not None:
 img2 = cv2.imread(path, cv2.IMREAD_COLOR)
 
 #Rotate image
-img3 = cv2.rotate(img2, cv2.ROTATE_90_CLOCKWISE)
+img2 = cv2.rotate(img2, cv2.ROTATE_90_CLOCKWISE)
 
 #Resizing image
-copia2 = img3
-copia2 = cv2.resize(copia,(1000,700),interpolation = cv2.INTER_AREA)
-cv2.imshow("resized", copia2)
-cv2.waitKey(0)
+copia2 = img2
+copia2 = cv2.resize(copia2,(1000,700),interpolation = cv2.INTER_AREA)
+#cv2.imshow("resized", copia2)
+#cv2.waitKey(0)
 
 
 #Separamos en 3 canales y Aumentamos contrasted del canal verde
 #RGB split
-b, g , r  = cv2.split(copia2)
+b3, g3 , r3  = cv2.split(copia2)
 #enhanced_green = cv2.equalizeHist(g)
 # Merge the channels back
 #enhanced_image = cv2.merge([b, enhanced_green, r])
@@ -206,59 +213,72 @@ b, g , r  = cv2.split(copia2)
 #cv2.waitKey(0)
 
 
-#Thresholding
-_,th = cv2.threshold(g,150,255, cv2.THRESH_BINARY)
-#cv2.imshow("binary", th)
+
+alpha = 1.9  # Contrast control (1.0-3.0)
+beta = 0    # Brightness control (0-100)
+
+# Adjust contrast and brightness
+g3 = cv2.convertScaleAbs(g3, alpha=alpha, beta=beta)
+#cv2.imshow('Contrast', g3)
 #cv2.waitKey(0)
+
+#Thresholding
+_,th2 = cv2.threshold(g3,90,255, cv2.THRESH_BINARY)
+#th2 = cv2.adaptiveThreshold(g3, 255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 21, 4)
+#th2 = cv2.adaptiveThreshold(g3,255,cv2.ADAPTIVE_THRESH_MEAN_C,cv2.THRESH_BINARY,29,10)
+cv2.imshow("binary", th2)
+cv2.waitKey(0)
 
 
 #Bluring image
-g2 = cv2.medianBlur(th,3)
+g4 = cv2.medianBlur(th2,3)
 #g2 = cv2.medianBlur(th,5)
-#cv2.imshow("blurred", g2)
+#cv2.imshow("blurred", g4)
 #cv2.waitKey(0)
 
 
 #Border detection
-g2 = cv2.Canny(g2,0,10)
+g4 = cv2.Canny(g4,0,10)
 #g2 = cv2.Canny(g2,0,20)
-#cv2.imshow("canny", g2)
+#cv2.imshow("canny", g4)
 #cv2.waitKey(0)
 
 #Border dilation and erode
-g2 = cv2.dilate(g2, None, iterations=1)
-g2 = cv2.erode(g2, None, iterations=1)
-#cv2.imshow("dilate and erode", g2)
+g4 = cv2.dilate(g4, None, iterations=1)
+g4 = cv2.erode(g4, None, iterations=1)
+#cv2.imshow("dilate and erode", g4)
 #cv2.waitKey(0)
 
 
 #rows = g2.shape[0]
-detected_circles = cv2.HoughCircles(g2,cv2.HOUGH_GRADIENT, 1, 20, param1 = 100, param2 = 6, minRadius = 5, maxRadius = 12)
-#detected_circles = cv2.HoughCircles(g2,cv2.HOUGH_GRADIENT, 1, 20, param1 = 100, param2 = 11, minRadius = 13, maxRadius = 29)
-detected_circles2 = cv2.HoughCircles(g2,cv2.HOUGH_GRADIENT, 1, 20, param1 = 100, param2  = 30, minRadius = 3, maxRadius = 27)
+detected_circles3 = cv2.HoughCircles(g4,cv2.HOUGH_GRADIENT, 1, 20, param1 = 100, param2 = 10, minRadius = 5, maxRadius = 12)
+#detected_circles3 = cv2.HoughCircles(g4,cv2.HOUGH_GRADIENT, 1, 20, param1 = 100, param2 = 11, minRadius = 13, maxRadius = 29)
+detected_circles4 = cv2.HoughCircles(g4,cv2.HOUGH_GRADIENT, 1, 20, param1 = 100, param2  = 10, minRadius = 3, maxRadius = 27)
 
 count2 = 0
 
-if detected_circles is not None and detected_circles2 is not None:
+if detected_circles3 is not None and detected_circles4 is not None:
 
-    detected_circles = np.uint16(np.around(detected_circles))
-    detected_circles2 = np.uint16(np.around(detected_circles2))
+    detected_circles3 = np.uint16(np.around(detected_circles3))
+    detected_circles4 = np.uint16(np.around(detected_circles4))
 
-    for pt in detected_circles[0, :]:
+    for pt in detected_circles3[0, :]:
         a, b, r = pt[0], pt[1], pt[2]
 
-        cv2.circle(copia2, (a,b), r, (0, 255, 0), 2)
+        cv2.circle(copia2, (a,b), r, (243, 122, 245), 2)
 
-        cv2.circle(copia2, (a,b), 1, (0, 0, 255), 3)
+        cv2.circle(copia2, (a,b), 1, (143, 0, 235), 3)
         count2 += 1
-        cv2.imshow("Circles", copia2)
+        cv2.imshow("Positive", copia2)
 
 ############################################################################
+ratio = count/count2
 #Displaying image
 #cv2.imshow('image',copia)
 #cv2.imshow('Green', g2)
 #print(count)
 show_variable(count)
-sshow_variable(count2)
+show_variable(count2)
+show_ratio(ratio)
 cv2.waitKey(0)
 cv2.destroyAllWindows()
