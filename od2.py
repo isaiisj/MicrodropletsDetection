@@ -59,7 +59,7 @@ def main():
     enhanced_green = cv2.equalizeHist(g)
     
     _, th = cv2.threshold(enhanced_green, 150, 255, cv2.THRESH_BINARY)#Parametro importante
-    cv2.imshow("a ver", th)
+    #cv2.imshow("a ver", th)
 
     g2 = cv2.medianBlur(th, 3)
     g2 = cv2.Canny(g2, 0, 10)
@@ -83,11 +83,12 @@ def main():
             cv2.imshow("All", copia)
 
         # Obtener la tonalidad de la gota
-        tonalidad = np.mean(enhanced_green[b - r:b + r, a - r:a + r])
-        tonalidades.append(tonalidad)
+            tonalidad = np.mean(copia[b - r:b + r, a - r:a + r])
+            tonalidades.append(tonalidad)
 
     count3 = len(tonalidades)
-            
+    print("El total de gotas es:", f"{count3}")
+
     cv2.waitKey(0)
     img2 = cv2.imread(path, cv2.IMREAD_COLOR)
     img2 = cv2.rotate(img2, cv2.ROTATE_90_CLOCKWISE)
