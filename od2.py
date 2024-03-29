@@ -133,8 +133,9 @@ def main():
     cv2.destroyAllWindows()
 
     # Graficar la dispersión de las tonalidades
+    threshold = 45
     plt.figure()
-    plt.scatter(range(1, count3 + 1), tonalidades, color='green')
+    plt.scatter(range(1, count3 + 1), tonalidades, color=['green' if y <= threshold else 'red' for y in tonalidades])
     plt.title('Tonalidades de las Gotas')
     plt.xlabel('Número de Gota')
     plt.ylabel('Tonalidad')
