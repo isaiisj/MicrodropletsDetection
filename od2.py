@@ -1,3 +1,40 @@
+########################################
+'''
+class CanvasImage:
+    def __init__(self, title = "Image Loader"):
+        self.master = tk.Tk()
+        self.master.withdraw()
+        self.master.title(title)
+        self.canvas = tk.Canvas(self.master)
+        self.canvas.grid(row = 0, column = 0, sticky = tk.NSEW)
+        self.image_button = tk.Button(
+            self.master, font = "Helvetica 12",
+            text = "Choose Image", command = self.choose_image)
+        self.image_button.grid(row = 1, column = 0, sticky = tk.NSEW)
+        self.master.update()
+        self.master.resizable(False, False)
+        self.master.deiconify()
+        self.image_path = None  # Variable to store the image path
+    def choose_image(self):
+        image_name = fd.askopenfilename(title = "Pick your image")
+        print(image_name)
+        if image_name:
+            self.image_path = image_name  # Save the image path to the variable
+            self.image = tk.PhotoImage(file = image_name, master = self.master)
+            w, h = self.image.width(),self.image.height()
+            self.canvas.config(width = w, height = h)
+            self.canvas.create_image((0,0), image = self.image, anchor = tk.NW)
+        return self.image_path '''
+'''
+if __name__ == "__main__":
+    loader = CanvasImage()
+    loader.master.mainloop()'''
+'''
+loader = CanvasImage()
+path = loader.choose_image()
+loader.master.mainloop()'''
+###########################################################33
+
 import cv2
 import numpy as np
 from matplotlib import pyplot as plt
@@ -7,7 +44,7 @@ import os
 from tkinter import filedialog as fd
 from tkinter.messagebox import showinfo
 from scipy import fftpack
-from PIL import Image
+from PIL import Image,ImageTk
 
 def show_variable(variable_value):
     showinfo("Total droplets", f"Number of droplets: {variable_value}")
@@ -31,6 +68,14 @@ class ImageSelectorApp:
         self.select_button = tk.Button(master, text="Select Image", command=self.select_image, font="Helvetica 12", width=35, height=3)
         self.select_button.pack(pady=10)
 
+        # Create a frame for the left side
+        self.left_frame = tk.Frame(master)
+        self.left_frame.pack(side=tk.LEFT, padx=10, pady=10)
+
+        # Create an image container on the left side
+        self.image_container = tk.Label(self.left_frame)
+        self.image_container.pack()
+
         self.selected_image_path = None
 
     def select_image(self):
@@ -38,6 +83,12 @@ class ImageSelectorApp:
         if image_path:
             self.image_path_var.set(image_path)
             self.selected_image_path = image_path
+            img = Image.open(image_path)
+            img.thumbnail((300, 300))  # Resize image if needed
+            img_tk = ImageTk.PhotoImage(img)
+            self.image_container.configure(image=img_tk)
+            self.image_container.image = img_tk  # Keep a reference to avoid garbage collection
+
 
 def main():
     root = tk.Tk()
