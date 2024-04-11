@@ -77,6 +77,7 @@ class ImageSelectorApp:
         self.image_container.pack()
 
         self.selected_image_path = None
+        self.accept_button = None
 
     def select_image(self):
         image_path = fd.askopenfilename(title="Select an image", filetypes=[("Image Files", "*.png *.jpg *.jpeg *.gif")])
@@ -88,6 +89,16 @@ class ImageSelectorApp:
             img_tk = ImageTk.PhotoImage(img)
             self.image_container.configure(image=img_tk)
             self.image_container.image = img_tk  # Keep a reference to avoid garbage collection
+
+             # Create and pack the accept button
+            if self.accept_button:
+                self.accept_button.pack_forget()  # Remove the existing accept button if any
+            self.accept_button = tk.Button(self.master, text="Accept", command=self.accept_image, font="Helvetica 12", width=35, height=3)
+            self.accept_button.pack(pady=10)
+
+    def accept_image(self):
+        # Close the tkinter window and continue the program
+        self.master.destroy()
 
 
 def main():
@@ -107,9 +118,12 @@ def main():
     cv2.waitKey(0)
 
     b, g, r = cv2.split(copia)
-    enhanced_green = cv2.equalizeHist(g)
+    #enhanced_green = cv2.equalizeHist(g)
+    alpha = 1.9
+    beta = 0
+    enhanced_green = cv2.convertScaleAbs(g, alpha=alpha, beta=beta)
     
-    _, th = cv2.threshold(enhanced_green, 150, 255, cv2.THRESH_BINARY)#Parametro importante
+    _, th = cv2.threshold(enhanced_green, 100, 255, cv2.THRESH_BINARY)#Parametro importante umbral menor
     #cv2.imshow("a ver", th)
 
     g2 = cv2.medianBlur(th, 3)
@@ -117,19 +131,16 @@ def main():
     g2 = cv2.dilate(g2, None, iterations=1)
     g2 = cv2.erode(g2, None, iterations=1)
 
-    detected_circles = cv2.HoughCircles(g2, cv2.HOUGH_GRADIENT, 1, 20, param1=100, param2=5 , minRadius=5, maxRadius=12) #parametro importante
-    detected_circles2 = cv2.HoughCircles(g2, cv2.HOUGH_GRADIENT, 1, 20, param1=100, param2=30, minRadius=3, maxRadius=27)
+    detected_circles = cv2.HoughCircles(g2, cv2.HOUGH_GRADIENT, 1, 25, param1=100, param2=7 , minRadius=18, maxRadius=25) #parametro importante
 
     count = 0
     tonalidades = []
-    if detected_circles is not None and detected_circles2 is not None:
+    if detected_circles is not None:
         detected_circles = np.uint16(np.around(detected_circles))
-        detected_circles2 = np.uint16(np.around(detected_circles2))
 
         for pt in detected_circles[0, :]:
             a, b, r = pt[0], pt[1], pt[2]
             cv2.circle(copia, (a,b), r, (0, 255, 0), 2)
-            cv2.circle(copia, (a,b), 1, (0, 0, 255), -1)
             count += 1
             cv2.imshow("All", copia)
 
@@ -159,18 +170,15 @@ def main():
     #cv2.imshow("Alpha & Beta Control", g4)
     #cv2.waitKey(0)
 
-    detected_circles3 = cv2.HoughCircles(g4, cv2.HOUGH_GRADIENT, 1, 20, param1=100, param2=10, minRadius=5, maxRadius=12)
-    detected_circles4 = cv2.HoughCircles(g4, cv2.HOUGH_GRADIENT, 1, 20, param1=100, param2=10, minRadius=3, maxRadius=27)
+    detected_circles3 = cv2.HoughCircles(g4, cv2.HOUGH_GRADIENT, 1, 15, param1=100, param2=10, minRadius=10, maxRadius=25)
 
     count2 = 0
-    if detected_circles3 is not None and detected_circles4 is not None:
+    if detected_circles3 is not None:
         detected_circles3 = np.uint16(np.around(detected_circles3))
-        detected_circles4 = np.uint16(np.around(detected_circles4))
 
         for pt in detected_circles3[0, :]:
             a, b, r = pt[0], pt[1], pt[2]
             cv2.circle(copia2, (a,b), r, (243, 122, 245), 2)
-            cv2.circle(copia2, (a,b), 1, (143, 0, 235), 3)
             count2 += 1
             cv2.imshow("Positive", copia2)
     
@@ -193,6 +201,28 @@ def main():
     plt.grid(True)
     plt.show()
 
+     # Crear histograma de tonalidades
+    plt.figure()
+    # Definir umbrales para categorizar las tonalidades
+    umbral1 = 20
+    umbral2 = 70
+    
+    # Separar tonalidades en diferentes categorías basadas en los umbrales
+    tonalidades_bajas = [tono for tono in tonalidades if tono <= umbral1]
+    tonalidades_medias = [tono for tono in tonalidades if umbral1 < tono <= umbral2]
+    tonalidades_altas = [tono for tono in tonalidades if tono > umbral2]
+    
+    # Crear histogramas separados para cada categoría
+    plt.hist(tonalidades_bajas, bins=30, color='blue', alpha=0.5, label='Tonalidades Bajas')
+    plt.hist(tonalidades_medias, bins=30, color='green', alpha=0.5, label='Tonalidades Medias')
+    plt.hist(tonalidades_altas, bins=30, color='red', alpha=0.5, label='Tonalidades Altas')
+
+    plt.title('Histograma de Tonalidades de las Gotas')
+    plt.xlabel('Tonalidad')
+    plt.ylabel('Número de Gotas')
+    plt.legend()
+    plt.grid(True)
+    plt.show()
+
 if __name__ == "__main__":
     main()
-
