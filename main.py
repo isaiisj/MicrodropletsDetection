@@ -44,6 +44,7 @@ import os
 from tkinter import filedialog as fd
 from tkinter.messagebox import showinfo
 from scipy import fftpack
+import imutils
 from PIL import Image,ImageTk
 
 def show_variable(variable_value):
@@ -52,177 +53,196 @@ def show_variable(variable_value):
 def show_ratio(variable_value):
     showinfo("Ratio", f"Ratio of droplets: {variable_value}")
 
-class ImageSelectorApp:
-    def __init__(self, master):
-        self.master = master
-        self.master.title("Image Selector")
-        self.master.resizable(False, False)
+def update_canny_low(value):
+    global low_threshold
+    low_threshold = value
+    apply_canny()
 
-        self.label = tk.Label(master, text="Choose Image:")
-        self.label.pack()
+def apply_canny():
+    global image, low_threshold
 
-        self.image_path_var = tk.StringVar()
-        self.image_path_label = tk.Label(master, textvariable=self.image_path_var)
-        self.image_path_label.pack()
-
-        self.select_button = tk.Button(master, text="Select Image", command=self.select_image, font="Helvetica 12", width=35, height=3)
-        self.select_button.pack(pady=10)
-
-        # Create a frame for the left side
-        self.left_frame = tk.Frame(master)
-        self.left_frame.pack(side=tk.LEFT, padx=10, pady=10)
-
-        # Create an image container on the left side
-        self.image_container = tk.Label(self.left_frame)
-        self.image_container.pack()
-
-        self.selected_image_path = None
-        self.accept_button = None
-
-    def select_image(self):
-        image_path = fd.askopenfilename(title="Select an image", filetypes=[("Image Files", "*.png *.jpg *.jpeg *.gif")])
-        if image_path:
-            self.image_path_var.set(image_path)
-            self.selected_image_path = image_path
-            img = Image.open(image_path)
-            img.thumbnail((300, 300))  # Resize image if needed
-            img_tk = ImageTk.PhotoImage(img)
-            self.image_container.configure(image=img_tk)
-            self.image_container.image = img_tk  # Keep a reference to avoid garbage collection
-
-             # Create and pack the accept button
-            if self.accept_button:
-                self.accept_button.pack_forget()  # Remove the existing accept button if any
-            self.accept_button = tk.Button(self.master, text="Accept", command=self.accept_image, font="Helvetica 12", width=35, height=3)
-            self.accept_button.pack(pady=10)
-
-    def accept_image(self):
-        # Close the tkinter window and continue the program
-        self.master.destroy()
-
-
-def main():
-    root = tk.Tk()
-    app = ImageSelectorApp(root)
-    root.mainloop()
-
-    path = app.selected_image_path
-    if not path:
-        print("No image selected.")
-        return
-
-    img = cv2.imread(path, cv2.IMREAD_COLOR)
-    img = cv2.rotate(img, cv2.ROTATE_90_CLOCKWISE)
-    copia = cv2.resize(img, (1000, 700), interpolation=cv2.INTER_AREA)
-    cv2.imshow("Imagen Original", copia)
-    cv2.waitKey(0)
-
-    b, g, r = cv2.split(copia)
-    #enhanced_green = cv2.equalizeHist(g)
-    alpha = 1.9
-    beta = 0
-    enhanced_green = cv2.convertScaleAbs(g, alpha=alpha, beta=beta)
+    if image is not None:
+        b, g, r = cv2.split(image)
+        #enhanced_green = cv2.equalizeHist(g)
+        alpha = 1.9
+        beta = 0
+        enhanced_green = cv2.convertScaleAbs(g, alpha=alpha, beta=beta)
     
-    _, th = cv2.threshold(enhanced_green, 100, 255, cv2.THRESH_BINARY)#Parametro importante umbral menor
-    #cv2.imshow("a ver", th)
+        _, th = cv2.threshold(enhanced_green, int(low_threshold), 255, cv2.THRESH_BINARY)#Parametro importante umbral menor
+        g2 = cv2.medianBlur(th, 3)
+        g2 = cv2.Canny(g2, 0, 10)
+        g2 = cv2.dilate(g2, None, iterations=1)
+        g2 = cv2.erode(g2, None, iterations=1)
 
-    g2 = cv2.medianBlur(th, 3)
-    g2 = cv2.Canny(g2, 0, 10)
-    g2 = cv2.dilate(g2, None, iterations=1)
-    g2 = cv2.erode(g2, None, iterations=1)
+        detected_circles = cv2.HoughCircles(g2, cv2.HOUGH_GRADIENT, 1, 25, param1=100, param2=7 , minRadius=5, maxRadius=10) #parametro importante
 
-    detected_circles = cv2.HoughCircles(g2, cv2.HOUGH_GRADIENT, 1, 25, param1=100, param2=7 , minRadius=18, maxRadius=25) #parametro importante
+        count = 0
+        tonalidades = []
+        
+        if detected_circles is not None:
+            detected_circles = np.uint16(np.around(detected_circles))
 
-    count = 0
-    tonalidades = []
-    if detected_circles is not None:
-        detected_circles = np.uint16(np.around(detected_circles))
+            for pt in detected_circles[0, :]:
+                a, b, r = pt[0], pt[1], pt[2]
+                cv2.circle(image, (a,b), r, (0, 255, 0), 2)
+                #count += 1
+                #cv2.imshow("All", image)
 
-        for pt in detected_circles[0, :]:
-            a, b, r = pt[0], pt[1], pt[2]
-            cv2.circle(copia, (a,b), r, (0, 255, 0), 2)
-            count += 1
-            cv2.imshow("All", copia)
+                #Obtener la tonalidad de la gota
+                #tonalidad = np.mean(image[b - r:b + r, a - r:a + r])
+                #tonalidades.append(tonalidad)
 
-        # Obtener la tonalidad de la gota
-            tonalidad = np.mean(copia[b - r:b + r, a - r:a + r])
-            tonalidades.append(tonalidad)
+        #imageToShowOutput = cv2.imshow(g2)
 
-    count3 = len(tonalidades)
-    print("El total de gotas es:", f"{count3}")
+        g2 = Image.fromarray(image)
+        img = ImageTk.PhotoImage(image=g2)
+        lblOutputImage.configure(image=img)
+        lblOutputImage.image = img
 
-    cv2.waitKey(0)
-    img2 = cv2.imread(path, cv2.IMREAD_COLOR)
-    img2 = cv2.rotate(img2, cv2.ROTATE_90_CLOCKWISE)
-    copia2 = cv2.resize(img2, (1000, 700), interpolation=cv2.INTER_AREA)
+        lblInfo3 = tk.Label(root, text="Salida", font="bold")
+        lblInfo3.grid(column=1,row=0,padx=5,pady=5)
 
-    b3, g3 , r3  = cv2.split(copia2)
-    alpha = 1.9  # Contrast control (1.0-3.0)
-    beta = 0    # Brightness control (0-100)
 
-    g3 = cv2.convertScaleAbs(g3, alpha=alpha, beta=beta)
-    _, th2 = cv2.threshold(g3, 89, 255, cv2.THRESH_BINARY)
+def elegir_imagen():
+    #Files types
+    path_image = fd.askopenfilename(filetypes=[("image",".jpg"),
+                                                       ("image",".jpeg"),
+                                                       ("image",".png")])
+    
+    if len(path_image) > 0:
+        global image
 
-    g4 = cv2.medianBlur(th2, 3)
-    g4 = cv2.Canny(g4, 0, 10)
-    g4 = cv2.dilate(g4, None, iterations=1)
-    g4 = cv2.erode(g4, None, iterations=1)
-    #cv2.imshow("Alpha & Beta Control", g4)
-    #cv2.waitKey(0)
+        #Read input image
+        image = cv2.imread(path_image)
+        image = imutils.resize(image, height=380)
+        image = cv2.rotate(image, cv2.ROTATE_90_CLOCKWISE)
 
-    detected_circles3 = cv2.HoughCircles(g4, cv2.HOUGH_GRADIENT, 1, 15, param1=100, param2=10, minRadius=10, maxRadius=25)
+        #Para visualizar la imagen
+        imageToShow = imutils.resize(image, width=180)
+        #imageToShow = cv2.cvtColor(imageToShow, cv2.COLOR_BGR2RGB)
+        im = Image.fromarray(imageToShow)
+        img = ImageTk.PhotoImage(image=im)
 
-    count2 = 0
-    if detected_circles3 is not None:
-        detected_circles3 = np.uint16(np.around(detected_circles3))
+        lblInputImage.configure(image=img)
+        lblInputImage.image = img
 
-        for pt in detected_circles3[0, :]:
-            a, b, r = pt[0], pt[1], pt[2]
-            cv2.circle(copia2, (a,b), r, (243, 122, 245), 2)
-            count2 += 1
-            cv2.imshow("Positive", copia2)
+        lblInfo1 = tk.Label(root, text="Imagen de entrada")
+        lblInfo1.grid(column=0,row=1,padx=5,pady=5)
+
+
+image = None
+low_threshold = 100
+
+
+root = tk.Tk()
+
+#Label of the input image 
+lblInputImage = tk.Label(root)
+lblInputImage.grid(column=0,row=2)
+
+#LAbel of the output image
+lblOutputImage = tk.Label(root)
+lblOutputImage.grid(column=1, row=1, rowspan=6)
+
+lblInfo2 = tk.Label(root, text="Parámetros", width=25)
+lblInfo2.grid(column=0, row=3, padx=5, pady=5)
+
+
+w = tk.Scale(root, from_=0, to=254,tickinterval=10, orient=tk.HORIZONTAL, command=update_canny_low)
+w.set(low_threshold)
+w.grid(column=0, row=3, padx=5, pady=5)
+
+#create the button for the selected image
+btn = tk.Button(root,text="Choose image", width=25, command=elegir_imagen)
+btn.grid(column=0,row=0,padx=5,pady=5)
+
+root.mainloop()
+
+
+
+
+
+#img = cv2.imread(path, cv2.IMREAD_COLOR)
+#img = cv2.rotate(img, cv2.ROTATE_90_CLOCKWISE)
+#copia = cv2.resize(img, (1000, 700), interpolation=cv2.INTER_AREA)
+
+#######################################################################33
+    
+'''
+
+count3 = len(tonalidades)
+print("El total de gotas es:", f"{count3}")
+
+cv2.waitKey(0)
+img2 = cv2.imread(path, cv2.IMREAD_COLOR)
+img2 = cv2.rotate(img2, cv2.ROTATE_90_CLOCKWISE)
+copia2 = cv2.resize(img2, (1000, 700), interpolation=cv2.INTER_AREA)
+
+b3, g3 , r3  = cv2.split(copia2)
+alpha = 1.9  # Contrast control (1.0-3.0)
+beta = 0    # Brightness control (0-100)
+
+g3 = cv2.convertScaleAbs(g3, alpha=alpha, beta=beta)
+_, th2 = cv2.threshold(g3, 89, 255, cv2.THRESH_BINARY)
+
+g4 = cv2.medianBlur(th2, 3)
+g4 = cv2.Canny(g4, 0, 10)
+g4 = cv2.dilate(g4, None, iterations=1)
+g4 = cv2.erode(g4, None, iterations=1)
+#cv2.imshow("Alpha & Beta Control", g4)
+#cv2.waitKey(0)
+
+detected_circles3 = cv2.HoughCircles(g4, cv2.HOUGH_GRADIENT, 1, 15, param1=100, param2=10, minRadius=10, maxRadius=25)
+
+count2 = 0
+if detected_circles3 is not None:
+    detected_circles3 = np.uint16(np.around(detected_circles3))
+
+    for pt in detected_circles3[0, :]:
+        a, b, r = pt[0], pt[1], pt[2]
+        cv2.circle(copia2, (a,b), r, (243, 122, 245), 2)
+        count2 += 1
+        cv2.imshow("Positive", copia2)
     
     
-    ratio = count / count2 if count2 != 0 else 0
+ratio = count / count2 if count2 != 0 else 0
 
-    show_variable(count)
-    show_variable(count2)
-    show_ratio(ratio)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
+show_variable(count)
+show_variable(count2)
+show_ratio(ratio)
+cv2.waitKey(0)
+cv2.destroyAllWindows()
 
-    # Graficar la dispersión de las tonalidades
-    threshold = 45
-    plt.figure()
-    plt.scatter(range(1, count3 + 1), tonalidades, color=['green' if y <= threshold else 'red' for y in tonalidades])
-    plt.title('Tonalidades de las Gotas')
-    plt.xlabel('Número de Gota')
-    plt.ylabel('Tonalidad')
-    plt.grid(True)
-    plt.show()
+# Graficar la dispersión de las tonalidades
+threshold = 68
+plt.figure()
+plt.scatter(range(1, count3 + 1), tonalidades, color=['green' if y <= threshold else 'red' for y in tonalidades])
+plt.title('Tonalidades de las Gotas')
+plt.xlabel('Número de Gota')
+plt.ylabel('Tonalidad')
+plt.grid(True)
+plt.show()
 
-     # Crear histograma de tonalidades
-    plt.figure()
-    # Definir umbrales para categorizar las tonalidades
-    umbral1 = 20
-    umbral2 = 70
+# Crear histograma de tonalidades
+plt.figure()
+# Definir umbrales para categorizar las tonalidades
+umbral1 = 20
+umbral2 = 70
     
-    # Separar tonalidades en diferentes categorías basadas en los umbrales
-    tonalidades_bajas = [tono for tono in tonalidades if tono <= umbral1]
-    tonalidades_medias = [tono for tono in tonalidades if umbral1 < tono <= umbral2]
-    tonalidades_altas = [tono for tono in tonalidades if tono > umbral2]
+# Separar tonalidades en diferentes categorías basadas en los umbrales
+tonalidades_bajas = [tono for tono in tonalidades if tono <= umbral1]
+tonalidades_medias = [tono for tono in tonalidades if umbral1 < tono <= umbral2]
+tonalidades_altas = [tono for tono in tonalidades if tono > umbral2]
     
-    # Crear histogramas separados para cada categoría
-    plt.hist(tonalidades_bajas, bins=30, color='blue', alpha=0.5, label='Tonalidades Bajas')
-    plt.hist(tonalidades_medias, bins=30, color='green', alpha=0.5, label='Tonalidades Medias')
-    plt.hist(tonalidades_altas, bins=30, color='red', alpha=0.5, label='Tonalidades Altas')
+# Crear histogramas separados para cada categoría
+plt.hist(tonalidades_bajas, bins=30, color='blue', alpha=0.5, label='Tonalidades Bajas')
+plt.hist(tonalidades_medias, bins=30, color='green', alpha=0.5, label='Tonalidades Medias')
+plt.hist(tonalidades_altas, bins=30, color='red', alpha=0.5, label='Tonalidades Altas')
 
-    plt.title('Histograma de Tonalidades de las Gotas')
-    plt.xlabel('Tonalidad')
-    plt.ylabel('Número de Gotas')
-    plt.legend()
-    plt.grid(True)
-    plt.show()
-
-if __name__ == "__main__":
-    main()
+plt.title('Histograma de Tonalidades de las Gotas')
+plt.xlabel('Tonalidad')
+plt.ylabel('Número de Gotas')
+plt.legend()
+plt.grid(True)
+plt.show()
+'''
