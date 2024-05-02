@@ -55,9 +55,16 @@ def show_variable(variable_value):
 def show_ratio(variable_value):
     showinfo("Ratio", f"Ratio of droplets: {variable_value}")
 
-def apply_canny(value):
-    global low_threshold
-    low_threshold = value
+def apply_canny_low(value):
+    apply_canny(value, param2)
+
+def apply_canny_param2(value):
+    apply_canny(low_threshold, value)
+
+def apply_canny(value1,value2):
+    global low_threshold, param2
+    low_threshold = value1
+    param2 = value2
 
     if image is not None:
         b, g, r = cv2.split(image)
@@ -71,7 +78,7 @@ def apply_canny(value):
         g2 = cv2.dilate(g2, None, iterations=1)
         g2 = cv2.erode(g2, None, iterations=1)
 
-        detected_circles = cv2.HoughCircles(g2, cv2.HOUGH_GRADIENT, 1, 25, param1=100, param2=7 , minRadius=5, maxRadius=10)
+        detected_circles = cv2.HoughCircles(g2, cv2.HOUGH_GRADIENT, 1, 25, param1=100, param2=int(param2) , minRadius=10, maxRadius=13)
         
         if detected_circles is not None:
             detected_circles = np.uint16(np.around(detected_circles))
@@ -81,7 +88,7 @@ def apply_canny(value):
                 a, b, r = pt[0], pt[1], pt[2]
                 cv2.circle(result_image, (a,b), r, (0, 255, 0), 2)
 
-            im = Image.fromarray(g2)
+            im = Image.fromarray(result_image)
             img = ImageTk.PhotoImage(image=im)
 
             lblOutputImage.configure(image=img)
@@ -95,7 +102,7 @@ def elegir_imagen():
     if len(path_image) > 0:
         global image
         image = cv2.imread(path_image)
-        image = imutils.resize(image, height=380)
+        image = imutils.resize(image, height=600)
         image = cv2.rotate(image, cv2.ROTATE_90_CLOCKWISE)
 
         imageToShow = imutils.resize(image, width=180)
@@ -111,6 +118,7 @@ def elegir_imagen():
 
 image = None
 low_threshold = 100
+param2 = 10
 
 root = tk.Tk()
 
@@ -118,20 +126,23 @@ lblInputImage = tk.Label(root)
 lblInputImage.grid(column=0,row=2)
 
 lblOutputImage = tk.Label(root)
-lblOutputImage.grid(column=1, row=1, rowspan=6)
+lblOutputImage.grid(column=1, row=1, rowspan=12)
 
 lblInfo2 = tk.Label(root, text="Parámetros", width=25)
 lblInfo2.grid(column=0, row=3, padx=5, pady=5)
 
-w = tk.Scale(root, from_=0, to=254,tickinterval=10, orient=tk.HORIZONTAL, command=apply_canny)
+w = tk.Scale(root, from_=0, to=254,tickinterval=1, orient=tk.HORIZONTAL, command=apply_canny_low)
 w.set(low_threshold)
 w.grid(column=0, row=3, padx=5, pady=5)
+
+x = tk.Scale(root, from_=1, to=30,tickinterval=1, orient=tk.HORIZONTAL, command=apply_canny_param2)
+x.set(param2)
+x.grid(column=0, row=4, padx=5, pady=5)
 
 btn = tk.Button(root,text="Choose image", width=25, command=elegir_imagen)
 btn.grid(column=0,row=0,padx=5,pady=5)
 
 root.mainloop()
-
 
 
 
@@ -180,6 +191,11 @@ if detected_circles3 is not None:
         count2 += 1
         cv2.imshow("Positive", copia2)
     
+        
+
+
+
+        
     
 ratio = count / count2 if count2 != 0 else 0
 
@@ -188,6 +204,7 @@ show_variable(count2)
 show_ratio(ratio)
 cv2.waitKey(0)
 cv2.destroyAllWindows()
+
 
 # Graficar la dispersión de las tonalidades
 threshold = 68
