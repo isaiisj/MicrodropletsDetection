@@ -47,79 +47,58 @@ from scipy import fftpack
 import imutils
 from PIL import Image,ImageTk
 
+
+
 def show_variable(variable_value):
     showinfo("Total droplets", f"Number of droplets: {variable_value}")
 
 def show_ratio(variable_value):
     showinfo("Ratio", f"Ratio of droplets: {variable_value}")
 
-def update_canny_low(value):
+def apply_canny(value):
     global low_threshold
     low_threshold = value
-    apply_canny()
-
-def apply_canny():
-    global image, low_threshold
 
     if image is not None:
         b, g, r = cv2.split(image)
-        #enhanced_green = cv2.equalizeHist(g)
         alpha = 1.9
         beta = 0
         enhanced_green = cv2.convertScaleAbs(g, alpha=alpha, beta=beta)
     
-        _, th = cv2.threshold(enhanced_green, int(low_threshold), 255, cv2.THRESH_BINARY)#Parametro importante umbral menor
+        _, th = cv2.threshold(enhanced_green, int(low_threshold), 255, cv2.THRESH_BINARY)
         g2 = cv2.medianBlur(th, 3)
         g2 = cv2.Canny(g2, 0, 10)
         g2 = cv2.dilate(g2, None, iterations=1)
         g2 = cv2.erode(g2, None, iterations=1)
 
-        detected_circles = cv2.HoughCircles(g2, cv2.HOUGH_GRADIENT, 1, 25, param1=100, param2=7 , minRadius=5, maxRadius=10) #parametro importante
-
-        count = 0
-        tonalidades = []
+        detected_circles = cv2.HoughCircles(g2, cv2.HOUGH_GRADIENT, 1, 25, param1=100, param2=7 , minRadius=5, maxRadius=10)
         
         if detected_circles is not None:
             detected_circles = np.uint16(np.around(detected_circles))
+            result_image = image.copy()
 
             for pt in detected_circles[0, :]:
                 a, b, r = pt[0], pt[1], pt[2]
-                cv2.circle(image, (a,b), r, (0, 255, 0), 2)
-                #count += 1
-                #cv2.imshow("All", image)
+                cv2.circle(result_image, (a,b), r, (0, 255, 0), 2)
 
-                #Obtener la tonalidad de la gota
-                #tonalidad = np.mean(image[b - r:b + r, a - r:a + r])
-                #tonalidades.append(tonalidad)
+            im = Image.fromarray(g2)
+            img = ImageTk.PhotoImage(image=im)
 
-        #imageToShowOutput = cv2.imshow(g2)
-
-        g2 = Image.fromarray(image)
-        img = ImageTk.PhotoImage(image=g2)
-        lblOutputImage.configure(image=img)
-        lblOutputImage.image = img
-
-        lblInfo3 = tk.Label(root, text="Salida", font="bold")
-        lblInfo3.grid(column=1,row=0,padx=5,pady=5)
-
+            lblOutputImage.configure(image=img)
+            lblOutputImage.image = img
 
 def elegir_imagen():
-    #Files types
     path_image = fd.askopenfilename(filetypes=[("image",".jpg"),
-                                                       ("image",".jpeg"),
-                                                       ("image",".png")])
+                                                ("image",".jpeg"),
+                                                ("image",".png")])
     
     if len(path_image) > 0:
         global image
-
-        #Read input image
         image = cv2.imread(path_image)
         image = imutils.resize(image, height=380)
         image = cv2.rotate(image, cv2.ROTATE_90_CLOCKWISE)
 
-        #Para visualizar la imagen
         imageToShow = imutils.resize(image, width=180)
-        #imageToShow = cv2.cvtColor(imageToShow, cv2.COLOR_BGR2RGB)
         im = Image.fromarray(imageToShow)
         img = ImageTk.PhotoImage(image=im)
 
@@ -133,30 +112,27 @@ def elegir_imagen():
 image = None
 low_threshold = 100
 
-
 root = tk.Tk()
 
-#Label of the input image 
 lblInputImage = tk.Label(root)
 lblInputImage.grid(column=0,row=2)
 
-#LAbel of the output image
 lblOutputImage = tk.Label(root)
 lblOutputImage.grid(column=1, row=1, rowspan=6)
 
 lblInfo2 = tk.Label(root, text="Parámetros", width=25)
 lblInfo2.grid(column=0, row=3, padx=5, pady=5)
 
-
-w = tk.Scale(root, from_=0, to=254,tickinterval=10, orient=tk.HORIZONTAL, command=update_canny_low)
+w = tk.Scale(root, from_=0, to=254,tickinterval=10, orient=tk.HORIZONTAL, command=apply_canny)
 w.set(low_threshold)
 w.grid(column=0, row=3, padx=5, pady=5)
 
-#create the button for the selected image
 btn = tk.Button(root,text="Choose image", width=25, command=elegir_imagen)
 btn.grid(column=0,row=0,padx=5,pady=5)
 
 root.mainloop()
+
+
 
 
 
