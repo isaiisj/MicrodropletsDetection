@@ -47,63 +47,148 @@ from scipy import fftpack
 import imutils
 from PIL import Image,ImageTk
 
+param2_all = 6
+param2_positive = 5
+low_threshold_all = 136
+low_threshold_positive = 230
+min_radius_active = 20      # Valor inicial de Radio mínimo
+max_radius_active = 25      # Valor inicial de Radio máximo
 
 
-def show_variable(variable_value):
+# Variables que se ajustan con los sliders
+param2_active = param2_all
+low_threshold_active = low_threshold_all
+
+def show_Total(variable_value):
     showinfo("Total droplets", f"Number of droplets: {variable_value}")
 
 def show_ratio(variable_value):
     showinfo("Ratio", f"Ratio of droplets: {variable_value}")
 
-def apply_canny_low(value):
-    apply_canny(value, param2)
+def rotate_image():
+    global image
+    if image is not None:
+        image = cv2.rotate(image, cv2.ROTATE_90_CLOCKWISE)
+        display_image()
 
-def apply_canny_param2(value):
-    apply_canny(low_threshold, value)
+def display_image():
+    if image is not None:
+        imageToShow = imutils.resize(image, width=180)
+        im = Image.fromarray(imageToShow)
+        img = ImageTk.PhotoImage(image=im)
+        lblOutputImage.configure(image=img)
+        lblOutputImage.image = img
+        apply_canny()
 
-def apply_canny(value1,value2):
-    global low_threshold, param2
-    low_threshold = value1
-    param2 = value2
-
+def apply_canny():
+    global tonalidades
+    global umbral_tonalidad
     if image is not None:
         b, g, r = cv2.split(image)
         alpha = 1.9
         beta = 0
         enhanced_green = cv2.convertScaleAbs(g, alpha=alpha, beta=beta)
-    
-        _, th = cv2.threshold(enhanced_green, int(low_threshold), 255, cv2.THRESH_BINARY)
-        g2 = cv2.medianBlur(th, 3)
-        g2 = cv2.Canny(g2, 0, 10)
-        g2 = cv2.dilate(g2, None, iterations=1)
-        g2 = cv2.erode(g2, None, iterations=1)
 
-        detected_circles = cv2.HoughCircles(g2, cv2.HOUGH_GRADIENT, 1, 25, param1=100, param2=int(param2) , minRadius=10, maxRadius=13)
+        _, th = cv2.threshold(enhanced_green, int(low_threshold_active), 255, cv2.THRESH_BINARY)
+        g2 = cv2.erode(th, None, iterations=1)
+
+        detected_circles = cv2.HoughCircles(g2, cv2.HOUGH_GRADIENT, 1, 20, param1=100, param2=int(param2_active), minRadius=int(min_radius_active), maxRadius=int(max_radius_active))
         
+        tonalidades = []
+        count = 0
         if detected_circles is not None:
             detected_circles = np.uint16(np.around(detected_circles))
             result_image = image.copy()
 
-            for pt in detected_circles[0, :]:
+            for i, pt in enumerate(detected_circles[0, :]):
                 a, b, r = pt[0], pt[1], pt[2]
-                cv2.circle(result_image, (a,b), r, (0, 255, 0), 2)
+                cv2.circle(result_image, (a, b), r, (0, 255, 0), 2)
+                tonalidad = np.mean(image[b - r:b + r, a - r:a + r])
+                tonalidades.append(tonalidad)
+                count += 1
 
+            umbral_tonalidad = sum(tonalidades) / len(tonalidades)
             im = Image.fromarray(result_image)
             img = ImageTk.PhotoImage(image=im)
 
             lblOutputImage.configure(image=img)
             lblOutputImage.image = img
 
+            print(umbral_tonalidad)
+            #show_Total(count)
+            print(count)
+
+        # Mostrar la gráfica solo si hay tonalidades filtradas
+def plot_droplets():
+    if tonalidades:
+        plt.figure()
+        y = np.arange(len(tonalidades))
+        x = tonalidades
+        colors = ['green' if val <= umbral_tonalidad else 'red' for val in tonalidades]
+        plt.scatter(y, x, color= colors)
+        plt.xlabel('Numero de gota')
+        plt.ylabel('Tonalidad')
+        plt.title('Distribución de Tonalidad de las Gotas Detectadas')
+        plt.show()
+
+
+        # Separar tonalidades en diferentes categorías basadas en los umbrales
+        tonalidades_bajas = [tono for tono in tonalidades if tono <= umbral_tonalidad]
+        tonalidades_altas = [tono for tono in tonalidades if tono > umbral_tonalidad]
+            
+        # Crear histogramas separados para cada categoría
+        plt.hist(tonalidades_bajas, bins=30, color='blue', alpha=0.5, label='Tonalidades Bajas')
+        plt.hist(tonalidades_altas, bins=30, color='red', alpha=0.5, label='Tonalidades Altas')
+        plt.title('Histograma de Tonalidades de las Gotas')
+        plt.xlabel('Tonalidad')
+        plt.ylabel('Número de Gotas')
+        plt.legend()
+        plt.grid(True)
+        plt.show()
+
+    else:
+        showinfo("Info", "No hay datos de tonalidades para mostrar.")
+
+
+def update_params(value):
+    global low_threshold_active, param2_active, min_radius_active, max_radius_active
+    low_threshold_active = w.get()
+    param2_active = x.get()
+    min_radius_active = y.get()
+    max_radius_active = z.get()
+    apply_canny()
+
+def set_all_droplets():
+    global param2_active, low_threshold_active, min_radius_active, max_radius_active
+    param2_active = param2_all
+    low_threshold_active = low_threshold_all
+    min_radius_active = 20  # Restablecer a valores predeterminados si es necesario
+    max_radius_active = 25
+    w.set(low_threshold_all)
+    x.set(param2_all)
+    y.set(20)
+    z.set(25)
+    apply_canny()
+
+def set_positive_droplets():
+    global param2_active, low_threshold_active, min_radius_active, max_radius_active
+    param2_active = param2_positive
+    low_threshold_active = low_threshold_positive
+    min_radius_active = 20  # Restablecer a valores predeterminados si es necesario
+    max_radius_active = 25
+    w.set(low_threshold_positive)
+    x.set(param2_positive)
+    y.set(20)
+    z.set(25)
+    apply_canny()
+
 def elegir_imagen():
-    path_image = fd.askopenfilename(filetypes=[("image",".jpg"),
-                                                ("image",".jpeg"),
-                                                ("image",".png")])
-    
+    path_image = fd.askopenfilename(filetypes=[("image", ".jpg"), ("image", ".jpeg"), ("image", ".png")])
     if len(path_image) > 0:
         global image
         image = cv2.imread(path_image)
         image = imutils.resize(image, height=600)
-        image = cv2.rotate(image, cv2.ROTATE_90_CLOCKWISE)
+        display_image()  # Mostrar imagen inmediatamente después de cargarla
 
         imageToShow = imutils.resize(image, width=180)
         im = Image.fromarray(imageToShow)
@@ -111,131 +196,49 @@ def elegir_imagen():
 
         lblInputImage.configure(image=img)
         lblInputImage.image = img
-
-        lblInfo1 = tk.Label(root, text="Imagen de entrada")
-        lblInfo1.grid(column=0,row=1,padx=5,pady=5)
-
+        apply_canny()  # Aplicar el filtro inmediatamente de que se carga la imagen
 
 image = None
-low_threshold = 100
-param2 = 10
+detected_circles = None
 
 root = tk.Tk()
 
 lblInputImage = tk.Label(root)
-lblInputImage.grid(column=0,row=2)
+lblInputImage.grid(column=0, row=2)
 
 lblOutputImage = tk.Label(root)
 lblOutputImage.grid(column=1, row=1, rowspan=12)
 
-lblInfo2 = tk.Label(root, text="Parámetros", width=25)
-lblInfo2.grid(column=0, row=3, padx=5, pady=5)
+btn_rotate = tk.Button(root, text="Rotate Image", command=rotate_image)
+btn_rotate.grid(column=1, row=0)  # Botón para rotar la imagen dentro del panel de imagen
 
-w = tk.Scale(root, from_=0, to=254,tickinterval=1, orient=tk.HORIZONTAL, command=apply_canny_low)
-w.set(low_threshold)
+btn = tk.Button(root, text="Choose image", width=25, command=elegir_imagen)
+btn.grid(column=0, row=0, padx=5, pady=5)
+
+w = tk.Scale(root, from_=0, to=254, resolution=1, orient=tk.HORIZONTAL, label="Umbral", command=update_params)
+w.set(low_threshold_active)
 w.grid(column=0, row=3, padx=5, pady=5)
 
-x = tk.Scale(root, from_=1, to=30,tickinterval=1, orient=tk.HORIZONTAL, command=apply_canny_param2)
-x.set(param2)
+x = tk.Scale(root, from_=1, to=30, resolution=1, orient=tk.HORIZONTAL, label="Sensibilidad de detección", command=update_params)
+x.set(param2_active)
 x.grid(column=0, row=4, padx=5, pady=5)
 
-btn = tk.Button(root,text="Choose image", width=25, command=elegir_imagen)
-btn.grid(column=0,row=0,padx=5,pady=5)
+# Agregar los nuevos sliders para Radio mínimo y Radio máximo
+y = tk.Scale(root, from_=0, to=100, resolution=1, orient=tk.HORIZONTAL, label="Radio mínimo", command=update_params)
+y.set(min_radius_active)
+y.grid(column=2, row=1, padx=5, pady=5)  # Posicionados a la derecha de la imagen de salida
+
+z = tk.Scale(root, from_=0, to=200, resolution=1, orient=tk.HORIZONTAL, label="Radio máximo", command=update_params)
+z.set(max_radius_active)
+z.grid(column=2, row=2, padx=5, pady=5)  # Debajo del slider de Radio mínimo
+
+btn_all = tk.Button(root, text="All Droplets", command=set_all_droplets)
+btn_all.grid(column=0, row=5, padx=5, pady=5)
+
+btn_positive = tk.Button(root, text="Positive Droplets", command=set_positive_droplets)
+btn_positive.grid(column=0, row=6, padx=5, pady=5)
+
+btn_plot = tk.Button(root, text="Plot Droplets", width=25, command=plot_droplets)
+btn_plot.grid(column=0, row=7, padx=5, pady=5)
 
 root.mainloop()
-
-
-
-
-
-
-#img = cv2.imread(path, cv2.IMREAD_COLOR)
-#img = cv2.rotate(img, cv2.ROTATE_90_CLOCKWISE)
-#copia = cv2.resize(img, (1000, 700), interpolation=cv2.INTER_AREA)
-
-#######################################################################33
-    
-'''
-
-count3 = len(tonalidades)
-print("El total de gotas es:", f"{count3}")
-
-cv2.waitKey(0)
-img2 = cv2.imread(path, cv2.IMREAD_COLOR)
-img2 = cv2.rotate(img2, cv2.ROTATE_90_CLOCKWISE)
-copia2 = cv2.resize(img2, (1000, 700), interpolation=cv2.INTER_AREA)
-
-b3, g3 , r3  = cv2.split(copia2)
-alpha = 1.9  # Contrast control (1.0-3.0)
-beta = 0    # Brightness control (0-100)
-
-g3 = cv2.convertScaleAbs(g3, alpha=alpha, beta=beta)
-_, th2 = cv2.threshold(g3, 89, 255, cv2.THRESH_BINARY)
-
-g4 = cv2.medianBlur(th2, 3)
-g4 = cv2.Canny(g4, 0, 10)
-g4 = cv2.dilate(g4, None, iterations=1)
-g4 = cv2.erode(g4, None, iterations=1)
-#cv2.imshow("Alpha & Beta Control", g4)
-#cv2.waitKey(0)
-
-detected_circles3 = cv2.HoughCircles(g4, cv2.HOUGH_GRADIENT, 1, 15, param1=100, param2=10, minRadius=10, maxRadius=25)
-
-count2 = 0
-if detected_circles3 is not None:
-    detected_circles3 = np.uint16(np.around(detected_circles3))
-
-    for pt in detected_circles3[0, :]:
-        a, b, r = pt[0], pt[1], pt[2]
-        cv2.circle(copia2, (a,b), r, (243, 122, 245), 2)
-        count2 += 1
-        cv2.imshow("Positive", copia2)
-    
-        
-
-
-
-        
-    
-ratio = count / count2 if count2 != 0 else 0
-
-show_variable(count)
-show_variable(count2)
-show_ratio(ratio)
-cv2.waitKey(0)
-cv2.destroyAllWindows()
-
-
-# Graficar la dispersión de las tonalidades
-threshold = 68
-plt.figure()
-plt.scatter(range(1, count3 + 1), tonalidades, color=['green' if y <= threshold else 'red' for y in tonalidades])
-plt.title('Tonalidades de las Gotas')
-plt.xlabel('Número de Gota')
-plt.ylabel('Tonalidad')
-plt.grid(True)
-plt.show()
-
-# Crear histograma de tonalidades
-plt.figure()
-# Definir umbrales para categorizar las tonalidades
-umbral1 = 20
-umbral2 = 70
-    
-# Separar tonalidades en diferentes categorías basadas en los umbrales
-tonalidades_bajas = [tono for tono in tonalidades if tono <= umbral1]
-tonalidades_medias = [tono for tono in tonalidades if umbral1 < tono <= umbral2]
-tonalidades_altas = [tono for tono in tonalidades if tono > umbral2]
-    
-# Crear histogramas separados para cada categoría
-plt.hist(tonalidades_bajas, bins=30, color='blue', alpha=0.5, label='Tonalidades Bajas')
-plt.hist(tonalidades_medias, bins=30, color='green', alpha=0.5, label='Tonalidades Medias')
-plt.hist(tonalidades_altas, bins=30, color='red', alpha=0.5, label='Tonalidades Altas')
-
-plt.title('Histograma de Tonalidades de las Gotas')
-plt.xlabel('Tonalidad')
-plt.ylabel('Número de Gotas')
-plt.legend()
-plt.grid(True)
-plt.show()
-'''
