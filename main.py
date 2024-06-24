@@ -39,7 +39,6 @@ import cv2
 import numpy as np
 from matplotlib import pyplot as plt
 import tkinter as tk
-from tkinter import ttk
 from tkinter import filedialog as fd
 from tkinter.messagebox import showinfo, showerror
 import imutils
@@ -63,6 +62,12 @@ manual_circles_low = []
 add_high_tone_circle = False
 add_low_tone_circle = False
 file_path = None
+
+# Variables para control negativo
+negative_control_image = None
+negative_control_tonalidades = []
+umbral_control = None
+desviacion_estandar_control = None
 
 def show_Total(variable_value):
     showinfo("Total droplets", f"Number of droplets: {variable_value}")
@@ -142,7 +147,11 @@ def apply_canny():
                     if not np.isnan(tonalidad):
                         tonalidades.append(tonalidad)
 
-        if len(tonalidades) > 0:
+        # Utilizar el umbral del control negativo
+        if umbral_control is not None:
+            # Ajustar el umbral utilizando la desviación estándar
+            umbral_tonalidad = umbral_control + 3 * desviacion_estandar_control
+        elif len(tonalidades) > 0:
             if len(tonalidades) >= 2:
                 # Aplicar K-means para encontrar el umbral
                 tonalidades = np.array(tonalidades).reshape(-1, 1).astype(np.float32)
@@ -150,11 +159,7 @@ def apply_canny():
                 k = 2
                 _, labels, centers = cv2.kmeans(tonalidades, k, None, criteria, 10, cv2.KMEANS_RANDOM_CENTERS)
                 centers = sorted(centers.flatten())
-                # Verificar si los centros están suficientemente separados
-                if abs(centers[1] - centers[0]) < 10:  # El umbral de separación mínimo puede ajustarse
-                    umbral_tonalidad = np.mean(tonalidades) + 10  # Umbral alternativo
-                else:
-                    umbral_tonalidad = sum(centers) / 2
+                umbral_tonalidad = sum(centers) / 2
             else:
                 umbral_tonalidad = np.mean(tonalidades) + 10  # Umbral alternativo si hay menos de 2 tonos
         else:
@@ -284,6 +289,48 @@ def elegir_imagen():
         lblInputImage.image = img
         apply_canny()
 
+def elegir_imagen_control():
+    path_image = fd.askopenfilename(filetypes=[("image", ".jpg"), ("image", ".jpeg"), ("image", ".png")])
+    if len(path_image) > 0:
+        global negative_control_image, negative_control_tonalidades, umbral_control, desviacion_estandar_control
+        negative_control_image = cv2.imread(path_image)
+        negative_control_image = imutils.resize(negative_control_image, height=600)
+        
+        # Calcular tonalidades del control negativo
+        b, g, r = cv2.split(negative_control_image)
+        alpha = 1.9
+        beta = 0
+        enhanced_green = cv2.convertScaleAbs(g, alpha=alpha, beta=beta)
+        blurred = cv2.GaussianBlur(enhanced_green, (9, 9), 2)
+        edges = cv2.Canny(blurred, low_threshold_all, low_threshold_all * 2)
+        edges = cv2.dilate(edges, None, iterations=2)
+        edges = cv2.erode(edges, None, iterations=1)
+        detected_circles = cv2.HoughCircles(edges, cv2.HOUGH_GRADIENT, 1, 20,
+                                            param1=50, param2=int(param2_all),
+                                            minRadius=int(min_radius_active), maxRadius=int(max_radius_active))
+        
+        negative_control_tonalidades = []
+        if detected_circles is not None:
+            detected_circles = np.uint16(np.around(detected_circles))
+            for pt in detected_circles[0, :]:
+                a, b, r = pt[0], pt[1], pt[2]
+                y1, y2 = max(int(b) - int(r), 0), min(int(b) + int(r), negative_control_image.shape[0])
+                x1, x2 = max(int(a) - int(r), 0), min(int(a) + int(r), negative_control_image.shape[1])
+                if y2 > y1 and x2 > x1:
+                    sub_image = negative_control_image[y1:y2, x1:x2]
+                    if sub_image.size > 0:
+                        tonalidad = np.mean(sub_image)
+                        if not np.isnan(tonalidad):
+                            negative_control_tonalidades.append(tonalidad)
+        if len(negative_control_tonalidades) > 0:
+            umbral_control = np.mean(negative_control_tonalidades)
+            desviacion_estandar_control = np.std(negative_control_tonalidades)
+            showinfo("Control Negativo", f"Control negativo cargado con {len(negative_control_tonalidades)} tonalidades.")
+        else:
+            umbral_control = None
+            desviacion_estandar_control = None
+            showerror("Error", "No se detectaron gotitas en el control negativo.")
+
 def add_or_remove_circle(event):
     global manual_circles_high, manual_circles_low, detected_circles, add_high_tone_circle, add_low_tone_circle
     x, y = event.x, event.y
@@ -393,6 +440,9 @@ btn_rotate.grid(column=1, row=0)
 
 btn = tk.Button(root, text="Choose image", width=25, command=elegir_imagen)
 btn.grid(column=0, row=0, padx=5, pady=5)
+
+btn_control = tk.Button(root, text="Choose control image", width=25, command=elegir_imagen_control)
+btn_control.grid(column=0, row=1, padx=5, pady=5)
 
 w = tk.Scale(root, from_=0, to=254, resolution=1, orient=tk.HORIZONTAL, label="Umbral", command=update_params)
 w.set(low_threshold_active)
