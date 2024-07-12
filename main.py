@@ -61,6 +61,7 @@ manual_circles_high = []
 manual_circles_low = []
 add_high_tone_circle = False
 add_low_tone_circle = False
+remove_detected_circle = False
 file_path = None
 
 # Variables para control negativo
@@ -209,6 +210,9 @@ def apply_canny():
         lblOutputImage.configure(image=img)
         lblOutputImage.image = img
 
+        # Mostrar el umbral actualizado en la etiqueta
+        lblUmbralTonalidad.config(text=f"Umbral de tonalidad: {umbral_tonalidad:.2f}")
+
         print("El umbral de la tonalidad está en ", umbral_tonalidad)
         print("El número total de microgotas es: ", total_circles)
         print("Tonalidades bajas: ", len(tonalidades_bajas))
@@ -332,7 +336,7 @@ def elegir_imagen_control():
             showerror("Error", "No se detectaron gotitas en el control negativo.")
 
 def add_or_remove_circle(event):
-    global manual_circles_high, manual_circles_low, detected_circles, add_high_tone_circle, add_low_tone_circle
+    global manual_circles_high, manual_circles_low, detected_circles, add_high_tone_circle, add_low_tone_circle, remove_detected_circle
     x, y = event.x, event.y
     min_radius = y_slider.get()
     max_radius = z_slider.get()
@@ -342,27 +346,119 @@ def add_or_remove_circle(event):
             manual_circles_high.append((x, y, radius))  # Agregar círculo con tonalidad alta
         elif add_low_tone_circle:
             manual_circles_low.append((x, y, radius))  # Agregar círculo con tonalidad baja
-        apply_canny()
+        update_image()
     elif event.num == 1:  # Clic izquierdo para eliminar
-        for circle in manual_circles_high:
-            cx, cy, r = circle
-            if (x - cx) ** 2 + (y - cy) ** 2 <= r ** 2:
-                manual_circles_high.remove(circle)
-                apply_canny()
-                return
-        for circle in manual_circles_low:
-            cx, cy, r = circle
-            if (x - cx) ** 2 + (y - cy) ** 2 <= r ** 2:
-                manual_circles_low.remove(circle)
-                apply_canny()
-                return
-        if detected_circles is not None:
-            for i, pt in enumerate(detected_circles[0, :]):
-                a, b, r = pt[0], pt[1], pt[2]
-                if (x - a) ** 2 + (y - b) ** 2 <= r ** 2:
-                    detected_circles = np.delete(detected_circles, i, axis=1)
-                    apply_canny()
+        if remove_detected_circle:
+            if detected_circles is not None:
+                for i, pt in enumerate(detected_circles[0, :]):
+                    a, b, r = pt[0], pt[1], pt[2]
+                    if (x - a) ** 2 + (y - b) ** 2 <= r ** 2:
+                        detected_circles = np.delete(detected_circles, i, axis=1)
+                        print(f"Circulo eliminado: ({a}, {b}, {r})")
+                        update_image()
+                        return
+        else:
+            for circle in manual_circles_high:
+                cx, cy, r = circle
+                if (x - cx) ** 2 + (y - cy) ** 2 <= r ** 2:
+                    manual_circles_high.remove(circle)
+                    update_image()
                     return
+            for circle in manual_circles_low:
+                cx, cy, r = circle
+                if (x - cx) ** 2 + (y - cy) ** 2 <= r ** 2:
+                    manual_circles_low.remove(circle)
+                    update_image()
+                    return
+
+def update_image():
+    result_image = image.copy()
+    all_circles = []
+    
+    if detected_circles is not None:
+        all_circles = [(pt[0], pt[1], pt[2]) for pt in detected_circles[0, :]]
+
+    global tonalidades, tonalidades_bajas, tonalidades_altas
+    tonalidades = []
+    for (a, b, r) in all_circles + manual_circles_high + manual_circles_low:
+        y1, y2 = max(int(b) - int(r), 0), min(int(b) + int(r), image.shape[0])
+        x1, x2 = max(int(a) - int(r), 0), min(int(a) + int(r), image.shape[1])
+        if y2 > y1 and x2 > x1:
+            sub_image = image[y1:y2, x1:x2]
+            if sub_image.size > 0:
+                tonalidad = np.mean(sub_image)
+                if not np.isnan(tonalidad):
+                    tonalidades.append(tonalidad)
+
+    if umbral_control is not None:
+        umbral_tonalidad = umbral_control + 3 * desviacion_estandar_control
+    elif len(tonalidades) > 0:
+        if len(tonalidades) >= 2:
+            tonalidades = np.array(tonalidades).reshape(-1, 1).astype(np.float32)
+            criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 100, 0.2)
+            k = 2
+            _, labels, centers = cv2.kmeans(tonalidades, k, None, criteria, 10, cv2.KMEANS_RANDOM_CENTERS)
+            centers = sorted(centers.flatten())
+            umbral_tonalidad = sum(centers) / 2
+        else:
+            umbral_tonalidad = np.mean(tonalidades) + 10
+    else:
+        umbral_tonalidad = 0
+
+    tonalidades = np.array(tonalidades).flatten()
+    tonalidades_bajas = [tono for tono in tonalidades if tono <= umbral_tonalidad]
+    tonalidades_altas = [tono for tono in tonalidades if tono > umbral_tonalidad]
+
+    for (a, b, r) in all_circles:
+        tonalidad = np.mean(image[max(int(b) - int(r), 0):min(int(b) + int(r), image.shape[0]), max(int(a) - int(r), 0):min(int(a) + int(r), image.shape[1])])
+        if tonalidad > umbral_tonalidad:
+            cv2.circle(result_image, (a, b), r, (255, 0, 0), 2)
+        else:
+            cv2.circle(result_image, (a, b), r, (0, 0, 255), 2)
+
+    for (x, y, r) in manual_circles_high:
+        cv2.circle(result_image, (x, y), r, (255, 0, 0), 2)
+
+    for (x, y, r) in manual_circles_low:
+        cv2.circle(result_image, (x, y), r, (0, 0, 255), 2)
+
+    lblTonalidadesBajas.config(text=f"Negative droplets: {len(tonalidades_bajas)}")
+    lblTonalidadesAltas.config(text=f"Positive droplets: {len(tonalidades_altas)}")
+
+    total_circles = len(tonalidades_bajas) + len(tonalidades_altas)
+    text = f'Total de microgotas: {total_circles}'
+    font_scale = 0.5
+    thickness = 1
+    color = (255, 255, 255)
+    font = cv2.FONT_HERSHEY_SIMPLEX
+
+    text_size, _ = cv2.getTextSize(text, font, font_scale, thickness)
+    text_w, text_h = text_size
+    pos_x = result_image.shape[1] - text_w - 10
+    pos_y = result_image.shape[0] - 10
+
+    cv2.putText(result_image, text, (pos_x, pos_y), font, font_scale, color, thickness)
+
+    im = Image.fromarray(result_image)
+    img = ImageTk.PhotoImage(image=im)
+
+    lblOutputImage.configure(image=img)
+    lblOutputImage.image = img
+
+    # Mostrar el umbral actualizado en la etiqueta
+    lblUmbralTonalidad.config(text=f"Umbral de tonalidad: {umbral_tonalidad:.2f}")
+
+def toggle_remove_detected_circle():
+    global remove_detected_circle
+    remove_detected_circle = not remove_detected_circle
+    if remove_detected_circle:
+        btn_remove_detected_circle.config(relief=tk.SUNKEN)
+        btn_high_tone_circle.config(state=tk.DISABLED)
+        btn_low_tone_circle.config(state=tk.DISABLED)
+    else:
+        btn_remove_detected_circle.config(relief=tk.RAISED)
+        btn_high_tone_circle.config(state=tk.NORMAL)
+        btn_low_tone_circle.config(state=tk.NORMAL)
 
 def toggle_high_tone_circle():
     global add_high_tone_circle, add_low_tone_circle
@@ -370,6 +466,7 @@ def toggle_high_tone_circle():
     add_low_tone_circle = False
     btn_high_tone_circle.config(relief=tk.SUNKEN)
     btn_low_tone_circle.config(relief=tk.RAISED)
+    btn_remove_detected_circle.config(state=tk.NORMAL)
 
 def toggle_low_tone_circle():
     global add_high_tone_circle, add_low_tone_circle
@@ -377,6 +474,7 @@ def toggle_low_tone_circle():
     add_low_tone_circle = True
     btn_high_tone_circle.config(relief=tk.RAISED)
     btn_low_tone_circle.config(relief=tk.SUNKEN)
+    btn_remove_detected_circle.config(state=tk.NORMAL)
 
 def reset_manual_circles():
     global manual_circles_high, manual_circles_low
@@ -441,22 +539,22 @@ btn_rotate.grid(column=1, row=0)
 btn = tk.Button(root, text="Choose image", width=25, command=elegir_imagen)
 btn.grid(column=0, row=0, padx=5, pady=5)
 
-btn_control = tk.Button(root, text="Choose control image", width=25, command=elegir_imagen_control)
+btn_control = tk.Button(root, text="Negative Control", width=25, command=elegir_imagen_control)
 btn_control.grid(column=0, row=1, padx=5, pady=5)
 
 w = tk.Scale(root, from_=0, to=254, resolution=1, orient=tk.HORIZONTAL, label="Umbral", command=update_params)
 w.set(low_threshold_active)
 w.grid(column=0, row=3, padx=5, pady=5)
 
-x = tk.Scale(root, from_=1, to=30, resolution=1, orient=tk.HORIZONTAL, label="Sensibilidad de detección", command=update_params)
+x = tk.Scale(root, from_=1, to=30, resolution=1, orient=tk.HORIZONTAL, label="Sensitivity", command=update_params)
 x.set(param2_active)
 x.grid(column=0, row=4, padx=5, pady=5)
 
-y_slider = tk.Scale(root, from_=0, to=100, resolution=1, orient=tk.HORIZONTAL, label="Radio mínimo", command=update_params)
+y_slider = tk.Scale(root, from_=0, to=100, resolution=1, orient=tk.HORIZONTAL, label="Minimum Radius", command=update_params)
 y_slider.set(min_radius_active)
 y_slider.grid(column=2, row=1, padx=5, pady=5)
 
-z_slider = tk.Scale(root, from_=0, to=200, resolution=1, orient=tk.HORIZONTAL, label="Radio máximo", command=update_params)
+z_slider = tk.Scale(root, from_=0, to=200, resolution=1, orient=tk.HORIZONTAL, label="Maximus Radius", command=update_params)
 z_slider.set(max_radius_active)
 z_slider.grid(column=2, row=2, padx=5, pady=5)
 
@@ -482,6 +580,10 @@ lblTonalidadesBajas.grid(column=2, row=3, padx=5, pady=5)
 lblTonalidadesAltas = tk.Label(root, text="Positive Droplets: 0")
 lblTonalidadesAltas.grid(column=2, row=4, padx=5, pady=5)
 
+# Añadir etiqueta para mostrar el umbral de tonalidad
+lblUmbralTonalidad = tk.Label(root, text="Umbral de tonalidad: 0.00")
+lblUmbralTonalidad.grid(column=2, row=10, padx=5, pady=5)
+
 # Botones para agregar círculos manualmente
 btn_high_tone_circle = tk.Button(root, text="Add Positive Droplet", command=toggle_high_tone_circle)
 btn_high_tone_circle.grid(column=2, row=5, padx=5, pady=5)
@@ -492,5 +594,9 @@ btn_low_tone_circle.grid(column=2, row=6, padx=5, pady=5)
 # Botón de reset
 btn_reset = tk.Button(root, text="Reset", command=reset_manual_circles)
 btn_reset.grid(column=2, row=7, padx=5, pady=5, sticky="se")
+
+# Botón para eliminar círculos detectados
+btn_remove_detected_circle = tk.Button(root, text="Remove Droplet", command=toggle_remove_detected_circle)
+btn_remove_detected_circle.grid(column=0, row=8, padx=5, pady=5)
 
 root.mainloop()
