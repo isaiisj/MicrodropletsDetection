@@ -1,5 +1,5 @@
-<h1>MicrodropletsDetection</h1>
-This is our thesis topic about Cuantification of viral charge (SARS-Cov2) on microdroplets using OpenCV and Image processing techniques with python programming language by Zuleima Hidalgo JAime and Isai Sanchez Jimenez.
+<h1>Quatification of viral charge (SARS-Cov2) on microdroplets using OpenCV and image processing</h1>
+This is our bachelor thesis topic about quantification of viral charge (SARS-Cov2) on microdroplets using OpenCV and Image processing techniques with python programming language by Zuleima Hidalgo JAime and Isai Sanchez Jimenez.
 <h2>Abstract</h2>
 <p>The techniques for counting por PCR viral detection are advancing,
 one way to do it is through microdroplets counting wich can be manually and 
