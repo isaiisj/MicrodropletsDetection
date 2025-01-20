@@ -7,3 +7,4 @@ a hard task and the other way is using the technology, computer vision and Machi
 to count and obtain information to process and analyze images.</p>
 <br>
 <img src="img/MG_CVM_KMEAN.png">
+<h2>How to run the program</h2>
