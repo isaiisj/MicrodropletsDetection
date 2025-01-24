@@ -8,4 +8,4 @@ to count and obtain information to process and analyze images.</p>
 <br>
 <img src="img/MG_CVM_KMEAN.png">
 <h2>How to run the program</h2>
-<p>If you want to run the program by your own, wou should download the file named <a href="src/main.py"><em>main.py</em></a> which cointains the source code, as well as some images to test it out.</p>
+<p>If you want to run the program by your own, wou should download the file named <a href="src/main.py"><em>main.py</em></a> which cointains the source code. Plus you hace to download as some images to test it out.</p>
