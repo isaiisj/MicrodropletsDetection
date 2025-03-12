@@ -1,4 +1,4 @@
-<h1>Quantification of (SARS-Cov2) viral load thorugh image processing of fluorescent microdroplets</h1>
+<h1>Quantification of (SARS-Cov-2) viral load thorugh image processing of fluorescent microdroplets</h1>
 This is our bachelor thesis topic about quantification of viral load (SARS-Cov2) on microdroplets using OpenCV and Image processing techniques with python programming language by Zuleima Hidalgo Jaime and Isai Sanchez Jimenez.
 <h2>Abstract</h2>
 <p>The techniques for counting por PCR viral detection are advancing,
